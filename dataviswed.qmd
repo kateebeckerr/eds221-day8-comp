@@ -1,0 +1,207 @@
+---
+title: "Data_Viz"
+format: html
+editor: visual
+---
+
+## Review basics of ggplot 
+
+### Installing packages 
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(patchwork)
+library(ggrepel)
+library(gghighlight)
+library(paletteer)
+library(gapminder)
+library(sf)
+```
+
+### Read in data
+
+```{r}
+lizards <- read_csv(here::here("data_tidy", "lizards.csv"))
+
+```
+
+### Data wrangling to create new subset from lizard where yoi 
+
+-   limit data to only include western whiptail , Colorado checkered, and eastern fence lizard
+
+```{r}
+few_lizards <- lizards %>%
+  filter(common_name %in% c("western whiptail", "colorado checkered", "eastern fence")) %>%
+  mutate(total_size_cm = total_length / 10)  %>%
+  group_by(common_name, site) %>%
+  summarize(mean_length_cm = mean(total_length_cm, na.rm = TRUE),
+            sd_length_cm = sd(total_length_cm, na.rm = TRUE))
+  
+```
+
+-   add a new colum with total length converted to cm
+
+```{=html}
+<!-- -->
+```
+-   group by species and site
+
+```{=html}
+<!-- -->
+```
+-   return a summary table with mean and total length and standard deviatio fo total length by species and sites
+
+## Scatter plot with color, map aesthetic, facet
+
+```{r}
+#anything in this line will override what was in top line 
+ggplot(data = lizards, aes(x = total_length, y = weight, colour = common_name)) +
+  geom_point() +
+  facet_wrap(~ common_name, scales = "free") #scales are differet! be careful!
+              
+```
+
+## 
+
+Use dplyr:: count to find total number of lizards by common name in the lizards datasets
+
+```{r}
+##dplyr wraps a group by, summarise and. n 
+lizard_counts <- lizards %>%
+  dplyr::count(common_name)
+
+
+```
+
+```{r}
+#good for means or sd
+lizards %>% 
+  group_by(common_name) %>%
+  summarize(n = n())
+```
+
+geom_call create bar chart of counts
+
+```{r}
+#will always be alphabetic order 
+#cout or amoutn data are too large flip access
+ggplot(lizard_counts, aes(x = common_name,y = n)) +
+       geom_col()
+```
+
+```{r}
+ggplot(lizard_counts, aes(x = n,y = common_name)) +
+       geom_col()
+```
+
+```{r}
+#characters show up in certain order, class of variable a factor, factors are discrete groups where you can specify meaninful order thats maintained hwen plotted in ggplot, groups to show up in meaninful order, convert to factor
+#what col should i look in to fidn order or levels 
+
+
+ggplot(lizard_counts, aes(y = fct_reorder(common_name, n), x = n)) +
+       geom_col(aes(colour = common_name))
+
+#can use levels, shows in order how theyre beign interpretated, or mutate to factor reorder common order based on antoher valuke would sue levels 
+```
+
+## Changing scales 
+
+scales: r package, scale for axis'
+
+```{r}
+#align scale with type of variable 
+#breaks = c(20, 80)
+#its scale color gradient because i used color = weight if it was fill would do opposite 
+ggplot(data = lizards, aes(x = total_length, y = weight, colour = weight)) +
+  geom_point() + 
+  scale_y_continuous(limits = c(0, 100), 
+                     breaks = seq(from = 0, to = 100, by = 20), 
+                     expand = c(0,0)) +
+  scale_color_gradient(low = "red", high = "navy")
+#or scale_color_gradientn(colours = c("yellow", "orange", "purple"))
+```
+
+```{r}
+ggplot(data = lizards, aes(x = total_length, y = weight, colour = weight)) +
+  geom_point() + 
+  scale_y_continuous(limits = c(0, 100), 
+                     breaks = seq(from = 0, to = 100, by = 20), 
+                     expand = c(0,0)) + 
+  scale_color_gradient(colours = c("yellow", "orange", "purple")
+```
+
+## Annotation 
+
+```{r}
+#add threshold and add annotation 
+ggplot(data = gapminder,aes(x = lifeExp, y = gdpPercap)) +
+  geom_point() +
+  annotate("text", x = 40, y = 90000, label = "A LABEL!") + 
+  geom_hline(yintercept = 70000, linetype = "dotted", color = "purple") + 
+  geom_vline(xintercept = mean(gapminder$lifeExp))
+
+```
+
+**piping data wrangling into ggplot**
+
+```{r}
+# or can d filter(year == 2002, continet == "europe")
+## ggrepel repulses labels 
+
+gapminder %>%
+  filter(year %in% c("2002"), continent %in% c("Europe")) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) +
+  geom_point(shape = 22, size = 4, color = "purple", fill = "orange") +
+  geom_text_repel(aes(label = country))
+
+```
+
+```{r}
+gapminder %>%
+  filter(year %in% c("2002"),
+         continent %in% c("Europe")) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() +
+  #geom_text_repel(aes(label = country)) +
+  gghighlight(country == "Poland", label_key = country)
+#condition for highlighting and what variable you want 
+```
+
+Create ggplot using data only from 2007, highlight all countries in europ eadding country name as the label
+
+```{r}
+gapminder %>%
+  filter(year == 2007) %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp)) +
+  geom_point() +
+  geom_text_repel(aes(label = country)) +
+  gghighlight(continent == "Europe")
+
+
+```
+
+## SF
+
+```{r}
+#geometry whole sequenc of rows to create a polygon 
+
+jornada_veg <- read_sf(here::here("data_raw", "spatial_vegetation", "doc.kml")) %>%
+  select(name = Name)
+
+ggplot() +
+  geom_sf(data = jornada_veg, aes(fill = name), colour = NA) + 
+  theme_minimal() +
+  scale_fill_paletteer_d(palette = "ggthemes::manyeys") + 
+  theme(panel.background = element_rect(color = "purple", size = 5, fill = "pink"),
+        plot.background = element_rect(fill = "yellow"), 
+        panel.grid.major = element_line(color = "magenta"),
+        axis.test.x = element_text(color = "red"))
+
+#palettes d shows package quality is no meaning of colors
+#jsut selecting name the spatial component is still there, select can rename, select exlude some columns, geom_sf will look in geom column 
+view(jornada_veg)
+
+```
